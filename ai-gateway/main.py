@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from ai_gateway.providers import ask
 from ai_gateway.supabase_config import set_config, get_config, get_all_config
-from config_engine.help_text import COMMANDS, COMMAND_HELP, CONFIG_HELP
+from config_engine.help_text import COMMANDS, format_command_help, format_config_help, list_all_configs
 # from config_engine.access import get_access_role
 from ai_gateway.supabase_roles import get_user_role, set_user_role, get_all_roles
 import logging
@@ -57,7 +57,12 @@ def help_root(request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, "Viewed help root")
-    return { "text": "Commands: " + ", ".join(COMMANDS.keys()) }
+    return { "text": (
+        "**Bot Help**\n"
+        "Commands: " + ", ".join(COMMANDS.keys()) + "\n"
+        "Type `@bot help <command>` for details on a command.\n"
+        "Type `@bot help config <key>` for config help."
+    ) }
 
 @app.get("/help/command/{command}")
 def help_command(command: str, request: Request):

@@ -126,36 +126,3 @@ def format_config_help(param: str) -> str:
 
 def list_all_configs() -> str:
     return ", ".join(sorted(CONFIG_HELP.keys()))
-    "anthropic_model": {
-        "desc": "Changes the Anthropic model (e.g., claude-3-opus-20240229).",
-        "usage": "@bot config set anthropic_model claude-3-opus-20240229",
-    },
-    "anthropic_temperature": {
-        "desc": "Sets response creativity for Anthropic models.",
-        "usage": "@bot config set anthropic_temperature 0.7",
-    },
-    "anthropic_max_tokens": {
-        "desc": "Limits max tokens returned by Anthropic models.",
-        "usage": "@bot config set anthropic_max_tokens 1000",
-    },
-    "mistral_api_key": {
-        "desc": "Mistral API key used for model calls. Restricted to secure use.",
-        "usage": "@bot config set mistral_api_key your-mistral-api-key",
-    },
-    "mistral_model": {
-        "desc": "Changes the Mistral model (e.g., mistral-medium).",
-        "usage": "@bot config set mistral_model mistral-medium",
-    },
-    "mistral_base_url": {
-        "desc": "Base URL for Mistral API (if using self-hosted endpoint).",
-        "usage": "@bot config set mistral_base_url https://api.mistral.ai",
-    },
-    "mistral_temperature": {
-        "desc": "Sets response creativity for Mistral models.",
-        "usage": "@bot config set mistral_temperature 0.7",
-    },
-    "mistral_max_tokens": {
-        "desc": "Limits max tokens returned by Mistral models.",
-        "usage": "@bot config set mistral_max_tokens 1000",
-    },
-}

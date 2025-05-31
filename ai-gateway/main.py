@@ -53,28 +53,32 @@ def show_user_role(user_id: str):
     return { "user_id": user_id, "role": role }
 
 @app.get("/help")
-async def help_root(request: Request):
+def help_root(request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, "Viewed help root")
     return { "text": "Commands: " + ", ".join(COMMANDS.keys()) }
 
 @app.get("/help/command/{command}")
-async def help_command(command: str, request: Request):
+def help_command(command: str, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, f"Viewed help for command: {command}")
-    return { "text": COMMAND_HELP.get(command, "No help found for this command.") }
+    return { "text": format_command_help(command) }
 
 @app.get("/help/config/{param}")
-async def help_config(param: str, request: Request):
+def help_config(param: str, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, f"Viewed help for config: {param}")
-    info = CONFIG_HELP.get(param)
-    if not info:
-        return { "text": "Unknown config key." }
-    return { "text": f"**{param}**: {info['desc']}\nUsage: `{info['usage']}`" }
+    return { "text": format_config_help(param) }
+
+@app.get("/help/config")
+def help_config_list(request: Request):
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    log_action(user_id, username, "Viewed config help list")
+    return { "text": "Available config options: " + list_all_configs() }
 
 @app.post("/config/personality")
 def config_personality(payload: ConfigUpdate, request: Request):

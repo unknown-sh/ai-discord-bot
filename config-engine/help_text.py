@@ -1,25 +1,42 @@
 COMMANDS = {
-    "help": "Show this message or help for a specific command.",
+    "help": "Show this message, help for a specific command, or list all commands. Usage: `@bot help`, `@bot help command <command>`, or `@bot show commands`.",
     "config": "View or update configuration values (models, keys, personality, etc).",
     "role": "Show or change access roles (admin/superadmin only).",
     "ask": "Send a prompt to the AI and get a response.",
     "about": "Show information about this bot.",
+    "show": "Show config keys, current values, or list all commands. Usage: `@bot show config`, `@bot show config <key>`, or `@bot show commands`."
 }
 
 COMMAND_HELP = {
-    "help": "Show this message or help for a specific command. Usage: `@bot help [command]`.",
+    "help": (
+        "Show this message, help for a specific command, or list all commands.\n"
+        "- Show all commands: `@bot show commands`\n"
+        "- Show help for a command: `@bot help command <command>`\n"
+        "- Show this help: `@bot help`"
+    ),
     "config": (
         "Change or view configuration.\n"
         "- Set: `@bot config set <key> <value>`\n"
         "- Show all: `@bot config show`\n"
         "- Get help: `@bot help config <key>`\n"
-        "- Example: `@bot config set model gpt-4`"
+        "- Example: `@bot config set model gpt-4`\n"
+        "- List all config keys: `@bot show config`\n"
+        "- Show value for a key: `@bot show config <key>`"
+    ),
+    "show": (
+        "Show config keys, values, roles, or all commands.\n"
+        "- List all config keys: `@bot show config`\n"
+        "- Show value for a key: `@bot show config <key>`\n"
+        "- List all commands: `@bot show commands`\n"
+        "- Show all roles: `@bot show roles` (superadmin only)\n"
+        "- Show a user's role: `@bot show role <@user or user_id>`"
     ),
     "role": (
-        "Show or change roles.\n"
-        "- Show: `@bot role show <@user>`\n"
-        "- Set: `@bot role set <@user> <role>` (superadmin only)\n"
-        "- List: `@bot role list`"
+        "Show or change user roles (superadmin only for changes).\n"
+        "- Show a user's role: `@bot show role <@user or user_id>`\n"
+        "- Show all roles: `@bot show roles`\n"
+        "- Add a role: `@bot add role <@user or user_id> <role>`\n"
+        "- Remove a role: `@bot remove role <@user or user_id>`"
     ),
     "ask": "Send a prompt to the AI and get a response. Usage: `@bot ask <your question>`.",
     "about": "Show information about this bot. Usage: `@bot about`.",

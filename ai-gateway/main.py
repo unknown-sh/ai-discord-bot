@@ -85,10 +85,142 @@ def help_config_list(request: Request):
     log_action(user_id, username, "Viewed config help list")
     return { "text": "Available config options: " + list_all_configs() }
 
+@app.get("/show/config")
+def show_config_list(request: Request):
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["user", "admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only users, admin, or superadmin can view config keys." }
+    log_action(user_id, username, "Listed all config keys")
+    from config_engine.help_text import CONFIG_HELP
+    lines = [f"{k}: {v['desc']}" for k, v in CONFIG_HELP.items()]
+    return { "text": "Available config keys:\n" + "\n".join(lines) }
+
+@app.get("/show/config/{key}")
+def show_config_key(key: str, request: Request):
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["user", "admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only users, admin, or superadmin can view config values." }
+    log_action(user_id, username, f"Showed config value for key: {key}")
+    value = get_config(key)
+    if value is None:
+        return { "text": f"No value set for config key: {key}" }
+    return { "text": f"Current value for `{key}`: {value}" }
+
+@app.get("/show/commands")
+def show_commands(request: Request):
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["user", "admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only users, admin, or superadmin can view commands." }
+    log_action(user_id, username, "Listed all bot commands")
+    from config_engine.help_text import COMMANDS
+    lines = [f"{k}: {v}" for k, v in COMMANDS.items()]
+    return { "text": "Available bot commands:\n" + "\n".join(lines) }
+
+def get_requester_role(request: Request) -> str:
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    return get_user_role(user_id)
+
+def require_role(request: Request, allowed_roles):
+    role = get_requester_role(request)
+    if role not in allowed_roles:
+        return False, role
+    return True, role
+
+@app.get("/show/roles")
+def show_roles(request: Request):
+    user_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only superadmin can view all roles." }
+    log_action(user_id, username, "Listed all roles")
+    roles = get_all_roles()
+    if not roles:
+        return { "text": "No roles found." }
+    lines = [f"{uid}: {role}" for uid, role in roles.items()]
+    return { "text": "All user roles:\n" + "\n".join(lines) }
+
+@app.get("/show/role/{user_id}")
+def show_role(user_id: str, request: Request):
+    requester_id = request.headers.get("X-Discord-User-ID", "unknown")
+    username = request.headers.get("X-Discord-Username", "unknown")
+    norm_id = extract_user_id(user_id)
+    allowed, role = require_role(request, ["superadmin"])
+    # Allow user to see their own role
+    if not allowed and norm_id != requester_id:
+        return { "text": "Permission denied: only superadmin can view roles for others." }
+    log_action(norm_id, username, f"Viewed role for user {user_id}")
+    role = get_user_role(norm_id)
+    if not role:
+        return { "text": f"No role found for user {user_id}." }
+    return { "text": f"User {user_id} has role: {role}" }
+
+from ai_gateway.discord_utils import fetch_discord_username
+
+@app.post("/add/role/{user_id}")
+def add_role(user_id: str, request: Request):
+    requester_id = request.headers.get("X-Discord-User-ID", "unknown")
+    actor_username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only superadmin can add roles." }
+    norm_id = extract_user_id(user_id)
+    data = request.json() if hasattr(request, 'json') else {}
+    role = data.get("role") if isinstance(data, dict) else None
+    # Accept username from request body if provided, else use header, else fetch from Discord
+    target_username = data.get("username") if isinstance(data, dict) and data.get("username") else actor_username
+    if (not target_username or target_username == "unknown"):
+        import os
+        bot_token = os.getenv("DISCORD_BOT_TOKEN")
+        if bot_token:
+            target_username = fetch_discord_username(norm_id, bot_token)
+        else:
+            target_username = "unknown"
+    if not role:
+        return { "text": "Missing 'role' in request body." }
+    log_action(norm_id, actor_username, f"Attempted to add role '{role}' for user {norm_id} ({target_username})")
+    set_user_role(norm_id, target_username, role)
+    return { "text": f"Role '{role}' added to user {norm_id} ({target_username})." }
+
+@app.post("/remove/role/{user_id}")
+def remove_role(user_id: str, request: Request):
+    requester_id = request.headers.get("X-Discord-User-ID", "unknown")
+    actor_username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only superadmin can remove roles." }
+    norm_id = extract_user_id(user_id)
+    data = request.json() if hasattr(request, 'json') else {}
+    target_username = data.get("username") if isinstance(data, dict) and data.get("username") else actor_username
+    if (not target_username or target_username == "unknown"):
+        import os
+        bot_token = os.getenv("DISCORD_BOT_TOKEN")
+        if bot_token:
+            target_username = fetch_discord_username(norm_id, bot_token)
+        else:
+            target_username = "unknown"
+    log_action(norm_id, actor_username, f"Attempted to remove role for user {norm_id} ({target_username})")
+    set_user_role(norm_id, target_username, "guest")
+    return { "text": f"Role removed for user {norm_id} (set to 'guest')." }
+
+@app.get("/hello")
+def hello_bot(request: Request):
+    username = request.headers.get("X-Discord-Username", "there")
+    return { "text": f"Hello, {username}! I'm your friendly bot. How can I help you today?" }
+
 @app.post("/config/personality")
 def config_personality(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only admin and superadmin can modify config." }
     log_action(user_id, username, f"Set personality: {payload.value}")
     set_config("AI_PERSONALITY", payload.value)
     return {"status": "ok"}
@@ -97,6 +229,9 @@ def config_personality(payload: ConfigUpdate, request: Request):
 def config_provider(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only admin and superadmin can modify config." }
     log_action(user_id, username, f"Set provider: {payload.value}")
     set_config("AI_PROVIDER", payload.value)
     return {"status": "ok"}
@@ -105,6 +240,9 @@ def config_provider(payload: ConfigUpdate, request: Request):
 def config_model(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only admin and superadmin can modify config." }
     log_action(user_id, username, f"Set model: {payload.value}")
     set_config("OPENAI_MODEL", payload.value)
     return {"status": "ok"}
@@ -128,6 +266,9 @@ def config_status(request: Request):
 async def ask_endpoint(request: Request, body: MessageRequest):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
+    allowed, role = require_role(request, ["user", "admin", "superadmin"])
+    if not allowed:
+        return { "text": "Permission denied: only users, admin, or superadmin can use @bot commands." }
     log_action(user_id, username, f"Asked: {body.message}")
     try:
         reply = await ask(body.message)

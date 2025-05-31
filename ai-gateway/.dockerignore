@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+*.env
+
+# VCS
+.git
+.gitignore
+
+# Mac
+.DS_Store
+
+# Docker
+docker-compose.yml
+
+# Logs
+*.log
+
+# Node-related (if any)
+node_modules/
+npm-debug.log

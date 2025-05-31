@@ -1,92 +1,119 @@
-import os
 import openai
 import requests
-
-AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")
-AI_PERSONALITY = os.getenv("AI_PERSONALITY", "")
-
-# --- OpenAI ---
-openai.api_key = os.getenv("OPENAI_API_KEY")
-openai_model = os.getenv("OPENAI_MODEL", "gpt-4")
-openai_temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
-openai_max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "1000"))
-openai_top_p = float(os.getenv("OPENAI_TOP_P", "1.0"))
-openai_presence_penalty = float(os.getenv("OPENAI_PRESENCE_PENALTY", "0.0"))
-openai_frequency_penalty = float(os.getenv("OPENAI_FREQUENCY_PENALTY", "0.0"))
-
-# --- Anthropic ---
-anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-3-opus-20240229")
-anthropic_temperature = float(os.getenv("ANTHROPIC_TEMPERATURE", "0.7"))
-anthropic_max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1000"))
-
-# --- Mistral ---
-mistral_api_key = os.getenv("MISTRAL_API_KEY")
-mistral_model = os.getenv("MISTRAL_MODEL", "mistral-medium")
-mistral_base_url = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai")
-mistral_temperature = float(os.getenv("MISTRAL_TEMPERATURE", "0.7"))
-mistral_max_tokens = int(os.getenv("MISTRAL_MAX_TOKENS", "1000"))
+import logging
+from ai_gateway.supabase_config import get_config
 
 # --- Provider Handlers ---
 
-def ask_openai(prompt):
+async def ask_openai(prompt):
     messages = []
 
-    if AI_PERSONALITY:
-        messages.append({"role": "system", "content": AI_PERSONALITY})
+    personality = await get_config("AI_PERSONALITY")
+    if personality:
+        messages.append({"role": "system", "content": personality})
 
     messages.append({"role": "user", "content": prompt})
 
-    response = openai.ChatCompletion.create(
-        model=openai_model,
-        messages=messages,
-        temperature=openai_temperature,
-        max_tokens=openai_max_tokens,
-        top_p=openai_top_p,
-        presence_penalty=openai_presence_penalty,
-        frequency_penalty=openai_frequency_penalty
-    )
-    return response.choices[0].message["content"]
+    model = await get_config("OPENAI_MODEL") or "gpt-4"
+    temperature = float(await get_config("OPENAI_TEMPERATURE") or "0.7")
+    max_tokens = int(await get_config("OPENAI_MAX_TOKENS") or "1000")
+    top_p = float(await get_config("OPENAI_TOP_P") or "1.0")
+    presence_penalty = float(await get_config("OPENAI_PRESENCE_PENALTY") or "0.0")
+    frequency_penalty = float(await get_config("OPENAI_FREQUENCY_PENALTY") or "0.0")
+    api_key = await get_config("OPENAI_API_KEY")
 
-def ask_anthropic(prompt):
-    full_prompt = f"{AI_PERSONALITY}\n\nHuman: {prompt}\n\nAssistant:" if AI_PERSONALITY else prompt
+    if not api_key:
+        logging.error("[OpenAI] Missing OPENAI_API_KEY")
+        return "OpenAI API key is not configured."
+
+    openai.api_key = api_key
+
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            presence_penalty=presence_penalty,
+            frequency_penalty=frequency_penalty
+        )
+        return response.choices[0].message["content"]
+    except Exception as e:
+        logging.error(f"[OpenAI API Error] {e}")
+        return "There was an error while processing your request with OpenAI."
+
+async def ask_anthropic(prompt):
+    personality = await get_config("AI_PERSONALITY")
+    full_prompt = f"{personality}\n\nHuman: {prompt}\n\nAssistant:" if personality else prompt
+
+    api_key = await get_config("ANTHROPIC_API_KEY")
+    model = await get_config("ANTHROPIC_MODEL") or "claude-3-opus-20240229"
+    temperature = float(await get_config("ANTHROPIC_TEMPERATURE") or "0.7")
+    max_tokens = int(await get_config("ANTHROPIC_MAX_TOKENS") or "1000")
+
+    if not api_key:
+        logging.error("[Anthropic] Missing ANTHROPIC_API_KEY")
+        return "Anthropic API key is not configured."
 
     headers = {
-        "x-api-key": anthropic_api_key,
+        "x-api-key": api_key,
         "content-type": "application/json",
         "anthropic-version": "2023-06-01"
     }
     body = {
-        "model": anthropic_model,
-        "max_tokens": anthropic_max_tokens,
-        "temperature": anthropic_temperature,
-        "messages": [{"role": "user", "content": full_prompt}]
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "prompt": full_prompt
     }
-    res = requests.post("https://api.anthropic.com/v1/messages", json=body, headers=headers)
-    return res.json()["content"][0]["text"]
+    try:
+        res = requests.post("https://api.anthropic.com/v1/complete", json=body, headers=headers, timeout=30)
+        res.raise_for_status()
+        return res.json()["completion"]
+    except Exception as e:
+        logging.error(f"[Anthropic API Error] {e} | Response: {getattr(res, 'text', 'No response')}")
+        return "There was an error while processing your request with Anthropic."
 
-def ask_mistral(prompt):
-    full_prompt = f"{AI_PERSONALITY}\n\n{prompt}" if AI_PERSONALITY else prompt
+async def ask_mistral(prompt):
+    personality = await get_config("AI_PERSONALITY")
+    full_prompt = f"{personality}\n\n{prompt}" if personality else prompt
+
+    api_key = await get_config("MISTRAL_API_KEY")
+    model = await get_config("MISTRAL_MODEL") or "mistral-medium"
+    base_url = await get_config("MISTRAL_BASE_URL") or "https://api.mistral.ai"
+    temperature = float(await get_config("MISTRAL_TEMPERATURE") or "0.7")
+    max_tokens = int(await get_config("MISTRAL_MAX_TOKENS") or "1000")
+
+    if not api_key:
+        logging.error("[Mistral] Missing MISTRAL_API_KEY")
+        return "Mistral API key is not configured."
 
     headers = {
-        "Authorization": f"Bearer {mistral_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     body = {
-        "model": mistral_model,
+        "model": model,
         "messages": [{"role": "user", "content": full_prompt}],
-        "temperature": mistral_temperature,
-        "max_tokens": mistral_max_tokens
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
-    res = requests.post(f"{mistral_base_url}/v1/chat/completions", json=body, headers=headers)
-    return res.json()["choices"][0]["message"]["content"]
+    try:
+        res = requests.post(f"{base_url}/v1/chat/completions", json=body, headers=headers, timeout=30)
+        res.raise_for_status()
+        return res.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        logging.error(f"[Mistral API Error] {e} | Response: {getattr(res, 'text', 'No response')}")
+        return "There was an error while processing your request with Mistral."
 
-def ask(prompt):
-    if AI_PROVIDER == "openai":
-        return ask_openai(prompt)
-    elif AI_PROVIDER == "anthropic":
-        return ask_anthropic(prompt)
-    elif AI_PROVIDER == "mistral":
-        return ask_mistral(prompt)
+async def ask(prompt):
+    provider = await get_config("AI_PROVIDER") or "openai"
+    if provider == "openai":
+        return await ask_openai(prompt)
+    elif provider == "anthropic":
+        return await ask_anthropic(prompt)
+    elif provider == "mistral":
+        return await ask_mistral(prompt)
     else:
-        raise ValueError(f"Unsupported AI_PROVIDER: {AI_PROVIDER}")
+        raise ValueError(f"Unsupported AI_PROVIDER: {provider}")

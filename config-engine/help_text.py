@@ -99,5 +99,5 @@ CONFIG_HELP = {
     "mistral_max_tokens": {
         "desc": "Limits max tokens returned by Mistral models.",
         "usage": "@bot config set mistral_max_tokens 1000",
-    }
+    },
 }

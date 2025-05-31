@@ -1,0 +1,19 @@
+# Ignore environment variables
+.env
+deploy/.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node modules (if applicable)
+node_modules/
+
+# Docker-related
+*.log
+*.pid
+*.tar
+*.sock
+
+# OS files
+.DS_Store

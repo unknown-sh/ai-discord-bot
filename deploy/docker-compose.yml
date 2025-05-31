@@ -1,0 +1,43 @@
+services:
+  # Discord client service
+  discord-client:
+    build:
+      context: ../
+      dockerfile: discord-client/Dockerfile
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}      # Discord bot token
+      SUPABASE_URL: ${SUPABASE_URL}        # Supabase project URL
+      SUPABASE_KEY: ${SUPABASE_KEY}        # Supabase service key
+      OPENAI_MODEL: ${OPENAI_MODEL}        # OpenAI model name
+      AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
+      AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
+      LOG_FILE: ${LOG_FILE}                # Log file path
+    depends_on:
+      - ai-gateway
+    restart: unless-stopped
+
+  # AI gateway service
+  ai-gateway:
+    build:
+      context: ../
+      dockerfile: ai-gateway/Dockerfile
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}    # OpenAI API key
+      SUPABASE_URL: ${SUPABASE_URL}        # Supabase project URL
+      SUPABASE_KEY: ${SUPABASE_KEY}        # Supabase service key
+      OPENAI_MODEL: ${OPENAI_MODEL}        # OpenAI model name
+      AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
+      AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
+      LOG_FILE: ${LOG_FILE}                # Log file path
+    volumes:
+      - ../config-engine:/app/config_engine
+      - ../ai-gateway:/app/ai_gateway
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+# Define a default network for inter-service communication
+networks:
+  default:
+    name: ai_discord_bot_network
+    driver: bridge

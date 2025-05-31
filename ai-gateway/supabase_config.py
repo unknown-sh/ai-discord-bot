@@ -34,7 +34,7 @@ SENSITIVE_KEYS = {"OPENAI_API_KEY", "SUPABASE_KEY", "ANTHROPIC_API_KEY", "MISTRA
 
 def mask_value(key, value):
     if key in SENSITIVE_KEYS and value:
-        return value[:4] + "..." + value[-4:] if len(value) > 8 else "****"
+        return "****"
     return value
 
 def get_config(key: str) -> str:

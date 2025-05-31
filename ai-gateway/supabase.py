@@ -13,7 +13,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     )
 else:
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY, is_async=True)
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         logging.info("[Supabase] Client initialized successfully")
     except Exception as e:
         logging.error(f"[Supabase] Failed to create client: {e}")

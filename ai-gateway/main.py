@@ -22,9 +22,7 @@ if not logger.handlers:
     stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     logger.addHandler(stream_handler)
 
-def log_action(user_id: str, username: str, action: str):
-    timestamp = datetime.utcnow().isoformat()
-    logger.info(f"{timestamp} - {username} ({user_id}) - {action}")
+from common.logging import log_action
 
 
 app = FastAPI()
@@ -44,14 +42,14 @@ class RoleUpdate(BaseModel):
     role: str
 
 @app.get("/acl/role/{user_id}")
-async def get_user_role_route(user_id: str):
-    role = await get_user_role(user_id)
+def get_user_role_route(user_id: str):
+    role = get_user_role(user_id)
     return {"role": role}
 
 # New route to show the role of a specified user
 @app.get("/acl/show/{user_id}")
-async def show_user_role(user_id: str):
-    role = await get_user_role(user_id)
+def show_user_role(user_id: str):
+    role = get_user_role(user_id)
     return { "user_id": user_id, "role": role }
 
 @app.get("/help")
@@ -79,36 +77,36 @@ async def help_config(param: str, request: Request):
     return { "text": f"**{param}**: {info['desc']}\nUsage: `{info['usage']}`" }
 
 @app.post("/config/personality")
-async def config_personality(payload: ConfigUpdate, request: Request):
+def config_personality(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, f"Set personality: {payload.value}")
-    await set_config("AI_PERSONALITY", payload.value)
+    set_config("AI_PERSONALITY", payload.value)
     return {"status": "ok"}
 
 @app.post("/config/provider")
-async def config_provider(payload: ConfigUpdate, request: Request):
+def config_provider(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, f"Set provider: {payload.value}")
-    await set_config("AI_PROVIDER", payload.value)
+    set_config("AI_PROVIDER", payload.value)
     return {"status": "ok"}
 
 @app.post("/config/model")
-async def config_model(payload: ConfigUpdate, request: Request):
+def config_model(payload: ConfigUpdate, request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, f"Set model: {payload.value}")
-    await set_config("OPENAI_MODEL", payload.value)
+    set_config("OPENAI_MODEL", payload.value)
     return {"status": "ok"}
 
 @app.get("/config/status")
-async def config_status(request: Request):
+def config_status(request: Request):
     user_id = request.headers.get("X-Discord-User-ID", "unknown")
     username = request.headers.get("X-Discord-Username", "unknown")
     log_action(user_id, username, "Checked config status")
     try:
-        return await get_all_config()
+        return get_all_config()
     except Exception:
         fallback_config = {
             "AI_PERSONALITY": os.getenv("AI_PERSONALITY", ""),
@@ -131,7 +129,7 @@ async def ask_endpoint(request: Request, body: MessageRequest):
 # --- ACL role set endpoint ---
 
 @app.post("/acl/set")
-async def set_user_role_route(payload: RoleUpdate, request: Request):
+def set_user_role_route(payload: RoleUpdate, request: Request):
     valid_roles = ["user", "admin", "superadmin"]
     if payload.role not in valid_roles:
         raise HTTPException(status_code=400, detail="Invalid role")
@@ -140,14 +138,14 @@ async def set_user_role_route(payload: RoleUpdate, request: Request):
     actor_name = request.headers.get("X-Discord-Username", "unknown")
     log_action(actor_id, actor_name, f"Set role of {payload.user_id} to {payload.role}")
 
-    await set_user_role(payload.user_id, "N/A", payload.role)
+    set_user_role(payload.user_id, "N/A", payload.role)
     return {"status": "ok"}
 
 
 # Route to list all roles from acl.yaml
 @app.get("/acl/all")
-async def list_all_roles():
+def list_all_roles():
     try:
-        return await get_all_roles()
+        return get_all_roles()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

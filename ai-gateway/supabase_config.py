@@ -20,35 +20,45 @@ ALLOWED_KEYS = {
     "MISTRAL_BASE_URL"
 }
 
-async def set_config(key: str, value: str):
+def set_config(key: str, value: str):
     if key not in ALLOWED_KEYS:
         raise ValueError(f"Invalid config key: {key}")
     try:
-        await supabase.table("bot_config").upsert({"key": key, "value": value}).execute()
+        supabase.table("bot_config").upsert({"key": key, "value": value}).execute()
         logging.info(f"[Supabase] Config set for key '{key}' to value '{value}'")
     except Exception as e:
         logging.error(f"[Supabase Error] Failed to set config for key '{key}': {str(e)}")
         raise
 
-async def get_config(key: str) -> str:
+SENSITIVE_KEYS = {"OPENAI_API_KEY", "SUPABASE_KEY", "ANTHROPIC_API_KEY", "MISTRAL_API_KEY"}
+
+def mask_value(key, value):
+    if key in SENSITIVE_KEYS and value:
+        return value[:4] + "..." + value[-4:] if len(value) > 8 else "****"
+    return value
+
+def get_config(key: str) -> str:
     try:
-        res = await supabase.table("bot_config").select("value").eq("key", key).limit(1).execute()
+        res = supabase.table("bot_config").select("value").eq("key", key).limit(1).execute()
         data = res.data
         if data:
             value = data[0]["value"]
-            logging.info(f"[Supabase] Fetched config key '{key}': '{value}'")
+            masked = mask_value(key, value)
+            logging.info(f"[Supabase] Fetched config key '{key}': '{masked}'")
             return value
         fallback = os.getenv(key)
-        logging.info(f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{fallback}'")
+        masked = mask_value(key, fallback)
+        logging.info(f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{masked}'")
         return fallback
     except Exception as e:
         fallback = os.getenv(key)
-        logging.warning(f"[Supabase Fallback] Failed to fetch config for key '{key}': {str(e)} — using fallback: '{fallback}'")
+        masked = mask_value(key, fallback)
+        logging.warning(f"[Supabase Fallback] Failed to fetch config for key '{key}': {str(e)} — using fallback: '{masked}'")
         return fallback
 
-async def get_all_config() -> dict:
+def get_all_config() -> dict:
     try:
-        res = await supabase.table("bot_config").select("*").execute()
+        res = supabase.table("bot_config").select("*").execute()
         logging.info("[Supabase] Fetched all config values from database")
         return {row["key"]: row["value"] for row in res.data}
     except Exception as e:

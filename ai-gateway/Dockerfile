@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory inside container
 WORKDIR /app
 
-COPY requirements.txt .
+COPY ai-gateway/requirements.txt .
 
 # Upgrade pip separately for better caching
 RUN pip install --no-cache-dir --upgrade pip
@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 COPY ai-gateway/ ./ai_gateway/
+COPY mcp-server/ ./mcp_server/
+COPY common/ ./common/
+COPY config-engine/ ./config_engine/
 
 
 # Expose port 8000 for Uvicorn

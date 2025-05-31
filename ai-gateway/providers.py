@@ -5,22 +5,22 @@ from ai_gateway.supabase_config import get_config
 
 # --- Provider Handlers ---
 
-async def ask_openai(prompt):
+def ask_openai(prompt):
     messages = []
 
-    personality = await get_config("AI_PERSONALITY")
+    personality = get_config("AI_PERSONALITY")
     if personality:
         messages.append({"role": "system", "content": personality})
 
     messages.append({"role": "user", "content": prompt})
 
-    model = await get_config("OPENAI_MODEL") or "gpt-4"
-    temperature = float(await get_config("OPENAI_TEMPERATURE") or "0.7")
-    max_tokens = int(await get_config("OPENAI_MAX_TOKENS") or "1000")
-    top_p = float(await get_config("OPENAI_TOP_P") or "1.0")
-    presence_penalty = float(await get_config("OPENAI_PRESENCE_PENALTY") or "0.0")
-    frequency_penalty = float(await get_config("OPENAI_FREQUENCY_PENALTY") or "0.0")
-    api_key = await get_config("OPENAI_API_KEY")
+    model = get_config("OPENAI_MODEL") or "gpt-4"
+    temperature = float(get_config("OPENAI_TEMPERATURE") or "0.7")
+    max_tokens = int(get_config("OPENAI_MAX_TOKENS") or "1000")
+    top_p = float(get_config("OPENAI_TOP_P") or "1.0")
+    presence_penalty = float(get_config("OPENAI_PRESENCE_PENALTY") or "0.0")
+    frequency_penalty = float(get_config("OPENAI_FREQUENCY_PENALTY") or "0.0")
+    api_key = get_config("OPENAI_API_KEY")
 
     if not api_key:
         logging.error("[OpenAI] Missing OPENAI_API_KEY")
@@ -107,13 +107,13 @@ async def ask_mistral(prompt):
         logging.error(f"[Mistral API Error] {e} | Response: {getattr(res, 'text', 'No response')}")
         return "There was an error while processing your request with Mistral."
 
-async def ask(prompt):
-    provider = await get_config("AI_PROVIDER") or "openai"
+def ask(prompt):
+    provider = get_config("AI_PROVIDER") or "openai"
     if provider == "openai":
-        return await ask_openai(prompt)
+        return ask_openai(prompt)
     elif provider == "anthropic":
-        return await ask_anthropic(prompt)
+        return ask_anthropic(prompt)
     elif provider == "mistral":
-        return await ask_mistral(prompt)
+        return ask_mistral(prompt)
     else:
         raise ValueError(f"Unsupported AI_PROVIDER: {provider}")

@@ -34,7 +34,14 @@ module.exports = async function handleAskCommand(message, args, axios, logger, g
       return;
     }
     try {
-      await message.reply(replyText && replyText.trim().length > 0 ? replyText : "Sorry, I couldn't generate a response.");
+      if (replyText && replyText.trim().length > 0) {
+        const chunks = replyText.match(/.{1,2000}/gs) || [replyText];
+        for (const chunk of chunks) {
+          await message.reply(chunk);
+        }
+      } else {
+        await message.reply("Sorry, I couldn't generate a response.");
+      }
     } catch (replyErr) {
       logger.error(`Discord message.reply failed:`, replyErr);
     }

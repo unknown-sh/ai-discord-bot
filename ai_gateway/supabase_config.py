@@ -68,22 +68,24 @@ async def get_config(key: str, role: str = None) -> str:
             .execute()
         )
         data = res.data
+        value = None
         if data:
             value = data[0]["value"]
-            if key in SENSITIVE_KEYS:
+        # Patch: Always fallback to env if value is None or empty for sensitive keys
+        if key in SENSITIVE_KEYS:
+            if value:
                 if role == "superadmin":
-                    logging.info(f"[Supabase] Fetched sensitive config key '{key}': (masked for log)")
-                    return value
-                else:
-                    return None
+                    logging.info(f"[Supabase] Fetched config key '{key}': '{mask_value(key, value)}'")
+                return value
+            fallback = os.getenv(key)
+            logging.warning(f"[Supabase Fallback] Sensitive key '{key}' missing or empty in DB; using .env fallback: '{mask_value(key, fallback)}'")
+            return fallback
+        # For non-sensitive keys
+        if value:
             logging.info(f"[Supabase] Fetched config key '{key}': '{mask_value(key, value)}'")
             return value
         fallback = os.getenv(key)
-        if key in SENSITIVE_KEYS and role != "superadmin":
-            return None
-        logging.info(
-            f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{mask_value(key, fallback)}'"
-        )
+        logging.info(f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{mask_value(key, fallback)}'")
         return fallback
     except Exception as e:
         fallback = os.getenv(key)

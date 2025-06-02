@@ -11,6 +11,7 @@ router = APIRouter()
 
 from . import memory
 
+from fastapi import Depends
 
 async def get_user_id_and_role(request: Request) -> Tuple[str, str]:
     """
@@ -26,6 +27,19 @@ async def get_user_id_and_role(request: Request) -> Tuple[str, str]:
     role = await get_user_role(user_id)
     return user_id, role
 
+@router.get("/mcp/get_all_roles")
+async def api_get_all_roles(user_and_role: Tuple[str, str] = Depends(get_user_id_and_role)):
+    """
+    List all roles and their users. Admin/superadmin only.
+    """
+    user_id, role = user_and_role
+    if role not in ("superadmin", "admin"):
+        raise HTTPException(status_code=403, detail="Unauthorized: admin or superadmin role required")
+    from ai_gateway.supabase_roles import get_all_roles
+    result = await get_all_roles()
+    await log_action(user_id, "get_all_roles", {"timestamp": datetime.utcnow().isoformat()})
+    return result
+
 
 @router.get("/healthz")
 async def healthz() -> Dict[str, str]:
@@ -34,6 +48,26 @@ async def healthz() -> Dict[str, str]:
     Returns status OK.
     """
     return {"status": "ok"}
+
+
+@router.get("/mcp/actions")
+async def mcp_list_actions():
+    """
+    List all available MCP actions and their schemas for discovery by clients.
+    """
+    return [
+        {"name": "get_all_roles", "description": "List all roles and their users", "parameters": {}, "permissions": ["admin", "superadmin"]},
+        {"name": "get_user_role", "description": "Get the role for a specific user", "parameters": {"user_id": "string"}, "permissions": ["admin", "superadmin"]},
+        {"name": "set_user_role", "description": "Set a user's role", "parameters": {"user_id": "string", "role": "string"}, "permissions": ["superadmin"]},
+        {"name": "get_config", "description": "Show all config values", "parameters": {}, "permissions": ["admin", "superadmin"]},
+        {"name": "get_config_key", "description": "Show value for a config key", "parameters": {"key": "string"}, "permissions": ["admin", "superadmin"]},
+        {"name": "set_config", "description": "Set a config value", "parameters": {"key": "string", "value": "string"}, "permissions": ["admin", "superadmin"]},
+        {"name": "delete_config", "description": "Delete a config key", "parameters": {"key": "string"}, "permissions": ["superadmin"]},
+        {"name": "list_config_keys", "description": "List all config keys", "parameters": {}, "permissions": ["admin", "superadmin"]},
+        {"name": "config_help", "description": "Show config help or help for a specific key", "parameters": {"key": "string (optional)"}, "permissions": ["admin", "superadmin"]},
+        {"name": "get_audit_log", "description": "Show audit log entries", "parameters": {"limit": "int (default 10)"}, "permissions": ["superadmin"]},
+        {"name": "help", "description": "Show help for a command", "parameters": {"command": "string (optional)"}, "permissions": ["all"]},
+    ]
 
 
 @router.post("/memory")
@@ -278,3 +312,56 @@ async def api_get_all_config(
         user_id, "get_all_config", {"timestamp": datetime.utcnow().isoformat()}
     )
     return result
+
+
+@router.delete("/config/delete/{key}")
+async def api_delete_config(
+    key: str, user_and_role: Tuple[str, str] = Depends(get_user_id_and_role)
+) -> Dict[str, str]:
+    """
+    Delete a config key. Superadmin only.
+    """
+    user_id, role = user_and_role
+    if role != "superadmin":
+        raise HTTPException(status_code=403, detail="Unauthorized: superadmin role required")
+    from ai_gateway.supabase_client import supabase
+    await supabase.table("bot_config").delete().eq("key", key).execute()
+    await log_action(user_id, "delete_config", {"key": key, "timestamp": datetime.utcnow().isoformat()})
+    return {"status": "ok", "deleted_key": key}
+
+
+@router.get("/config/keys")
+async def api_list_config_keys(
+    user_and_role: Tuple[str, str] = Depends(get_user_id_and_role)
+) -> Dict[str, Any]:
+    """
+    List all config keys. Admin/superadmin only.
+    """
+    user_id, role = user_and_role
+    if role not in ("superadmin", "admin"):
+        raise HTTPException(
+            status_code=403, detail="Unauthorized: admin or superadmin role required"
+        )
+    from ai_gateway.supabase_client import supabase
+    res = await supabase.table("bot_config").select("key").execute()
+    keys = [row["key"] for row in res.data] if res.data else []
+    await log_action(user_id, "list_config_keys", {"timestamp": datetime.utcnow().isoformat()})
+    return {"keys": keys}
+
+
+@router.get("/audit/logs")
+async def api_get_audit_logs(
+    user_and_role: Tuple[str, str] = Depends(get_user_id_and_role),
+    limit: int = 10
+) -> Dict[str, Any]:
+    """
+    Get audit log entries. Superadmin only.
+    """
+    user_id, role = user_and_role
+    if role != "superadmin":
+        raise HTTPException(status_code=403, detail="Unauthorized: superadmin role required")
+    from ai_gateway.supabase_client import supabase
+    result = supabase.table("audit_log").select("timestamp, user_id, username, action, ip, user_agent").order("timestamp", desc=True).limit(limit).execute()
+    logs = result.data if hasattr(result, "data") else []
+    await log_action(user_id, "get_audit_log", {"limit": limit, "timestamp": datetime.utcnow().isoformat()})
+    return {"logs": logs}

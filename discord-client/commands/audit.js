@@ -24,7 +24,16 @@ module.exports = async function handleAuditCommand(message, args, axios, logger,
     const headers = getDiscordHeaders(message);
     logger.info(`${message.author.username} (${message.author.id}) [${userRole}]: audit log (limit=${limit})`);
     try {
-      const res = await axios.get(`http://ai-gateway:8000/audit/logs?limit=${limit}`, { headers });
+      const limit = args[1] && !isNaN(args[1]) ? Number(args[1]) : 10;
+      let res;
+      try {
+        res = await axios.get(`http://ai-gateway:8000/mcp/audit/logs?limit=${limit}`, { headers });
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+          return message.reply('No audit logs found.');
+        }
+        throw err;
+      }
       if (res.data && Array.isArray(res.data.logs)) {
         if (res.data.logs.length === 0) {
           return message.reply('No audit log entries found.');

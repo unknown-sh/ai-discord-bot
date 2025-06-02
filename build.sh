@@ -64,7 +64,7 @@ else
 fi
 
 # 3. Docker build (using /deploy/docker-compose.yml)
-echo "[3/4] Building and starting Docker containers (discord-client, ai-gateway, mcp-memory)..."
+echo "[3/4] Building and starting Docker containers (discord-client, ai-gateway, mcp-memory, mcp-server)..."
 if command -v docker &> /dev/null; then
     echo "Stopping any running containers..."
     docker compose -f deploy/docker-compose.yml down 2>/dev/null || true
@@ -76,20 +76,20 @@ if command -v docker &> /dev/null; then
     fi
 
     echo "Building Docker containers (no cache, always fresh code)..."
-    DOCKER_BUILDKIT=1 docker compose -f deploy/docker-compose.yml build --no-cache --progress=plain
+    DOCKER_BUILDKIT=1 docker compose -f deploy/docker-compose.yml build --no-cache --progress=plain discord-client ai-gateway mcp-memory mcp-server
     echo "[NOTE] If you want to force a totally clean build (including images), run: docker compose -f deploy/docker-compose.yml build --no-cache"
-    echo "[INFO] This will build: discord-client, ai-gateway, and mcp-memory containers."
+    echo "[INFO] This will build: discord-client, ai-gateway, mcp-memory, and mcp-server containers."
 
     # Check if build was successful
     if [ $? -eq 0 ]; then
         echo "Docker build completed successfully!"
         # Start containers if requested
         if [ "$RUN_AFTER_BUILD" = true ]; then
-            echo "Starting all containers (including mcp-memory)..."
-            docker compose -f deploy/docker-compose.yml up
+            echo "Starting all containers (including mcp-server)..."
+            docker compose -f deploy/docker-compose.yml up discord-client ai-gateway mcp-memory mcp-server
         else
             echo -e "\nBuild complete! You can start the containers with:"
-            echo "docker compose -f deploy/docker-compose.yml up"
+            echo "docker compose -f deploy/docker-compose.yml up discord-client ai-gateway mcp-memory mcp-server"
         fi
     else
         echo "Error: Docker build failed. Please check the build output above for details."

@@ -66,9 +66,14 @@ class SupabaseLogHandler(logging.Handler):
             extra = getattr(record, "extra", {})
             user_id = extra.get("user_id", None)
             username = extra.get("username", None)
-            action = extra.get("action", msg)
-            # Use asyncio.create_task for non-blocking insert
-            asyncio.create_task(self._log_to_supabase(user_id, username, action))
+            action = extra.get("action", None)
+            # Proper async scheduling for coroutine
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._log_to_supabase(user_id, username, action))
+            except RuntimeError:
+                # No running event loop (e.g. called from sync context at startup)
+                asyncio.run(self._log_to_supabase(user_id, username, action))
         except Exception as e:
             print(
                 f"[SupabaseLogHandler] Failed to log to Supabase: {e}", file=sys.stderr

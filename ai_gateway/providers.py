@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+import logging
+import os
 import aiohttp
 import openai
 from ai_gateway.supabase_config import get_config
@@ -36,6 +38,8 @@ async def ask_openai(prompt: str) -> str:
     presence_penalty = float(await get_config("OPENAI_PRESENCE_PENALTY") or "0.0")
     frequency_penalty = float(await get_config("OPENAI_FREQUENCY_PENALTY") or "0.0")
     api_key = await get_config("OPENAI_API_KEY")
+    env_key = os.getenv("OPENAI_API_KEY")
+    logging.error(f"[DEBUG] os.getenv('OPENAI_API_KEY') = {mask_api_key(env_key)}; get_config('OPENAI_API_KEY') = {mask_api_key(api_key)}")
 
     if not api_key:
         logging.error("[OpenAI] Missing OPENAI_API_KEY")

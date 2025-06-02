@@ -11,7 +11,20 @@ async function getUserContext(userId, key) {
       headers: { 'X-User-ID': userId }
     });
     console.log(`[memory.js] getUserContext: success, data=`, resp.data);
-    return resp.data;
+    // Defensive: handle both dict and list responses
+    if (Array.isArray(resp.data)) {
+      if (resp.data.length > 0 && typeof resp.data[0] === 'object' && resp.data[0].value !== undefined) {
+        return { value: resp.data[0].value };
+      } else {
+        console.error('[memory.js] getUserContext: Unexpected list response from memory API:', resp.data);
+        throw new Error('[getUserContext] MCP returned a list, but no usable value found.');
+      }
+    } else if (resp.data && typeof resp.data === 'object') {
+      return resp.data;
+    } else {
+      console.error('[memory.js] getUserContext: Unexpected response type from memory API:', resp.data);
+      throw new Error('[getUserContext] MCP returned unexpected response type.');
+    }
   } catch (err) {
     console.error(`[memory.js] getUserContext ERROR:`, err && err.stack || err);
     if (err.response) {

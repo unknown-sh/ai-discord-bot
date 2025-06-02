@@ -10,6 +10,16 @@ const hasRole = require('./utils/hasRole');
 const getDiscordHeaders = require('./utils/getDiscordHeaders');
 const formatErrorReply = require('./utils/formatErrorReply');
 
+// Ensure logs directory exists before logger setup
+const fs = require('fs');
+const logsDir = path.join(__dirname, 'logs');
+try {
+  fs.mkdirSync(logsDir, { recursive: true });
+} catch (e) {
+  // If directory can't be created, fallback to console logging only
+  console.warn('[startup] Could not create logs directory:', logsDir, e);
+}
+
 // Logger setup
 const logFormat = format.printf(({ timestamp, level, message }) => {
   return `[${timestamp}] ${level.toUpperCase()}: ${message}`;
@@ -55,6 +65,8 @@ client.on('ready', () => {
   logger.info(`Logged in as ${client.user.tag}`);
 });
 
+const tryHandleNaturalLanguageMcp = require('./mcp_nl_handler');
+
 client.on('messageCreate', async (message) => {
   logger.info(`[MSG EVENT] Received message: ${message.content} from ${message.author.tag}`);
   if (message.author.bot) return;
@@ -86,9 +98,13 @@ client.on('messageCreate', async (message) => {
     } else if (command === 'audit') {
       await handleAuditCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
     } else {
-      // Any other message: treat as AI prompt (including one-word messages like 'hello')
-      const aiArgs = [command, ...args].filter(Boolean);
-      await handleAskCommand(message, aiArgs, axios, logger, getDiscordHeaders, formatErrorReply);
+      // Try natural language MCP handler as fallback
+      const handled = await tryHandleNaturalLanguageMcp(message, logger);
+      if (!handled) {
+        // Any other message: treat as AI prompt (including one-word messages like 'hello')
+        const aiArgs = [command, ...args].filter(Boolean);
+        await handleAskCommand(message, aiArgs, axios, logger, getDiscordHeaders, formatErrorReply);
+      }
     }
   } catch (err) {
     logger.error(`Command error: ${err.message}`);

@@ -26,16 +26,29 @@ module.exports = async function handleConfigCommand(message, args, axios, logger
           headers
         });
         // Canonical keys from backend
-        const { provider, model, personality } = res.data;
-        // Also fetch canonical keys directly for clarity
+        const { provider, model, personality, ...rest } = res.data;
+        // Only display non-sensitive config keys
+        const SENSITIVE_PATTERNS = [/key/i, /token/i, /secret/i, /password/i];
+        function isSensitive(key) {
+          return SENSITIVE_PATTERNS.some((pat) => pat.test(key));
+        }
         const keys = [
           { name: 'AI_PROVIDER', value: provider },
           { name: 'OPENAI_MODEL', value: model },
-          { name: 'AI_PERSONALITY', value: personality }
+          { name: 'AI_PERSONALITY', value: personality },
+          // Add any other non-sensitive config keys from rest
+          ...Object.entries(rest)
+            .filter(([k, v]) => !isSensitive(k))
+            .map(([k, v]) => ({ name: k, value: v }))
         ];
+        // Mask any sensitive keys that slipped through (defense in depth)
+        keys.forEach((item) => {
+          if (isSensitive(item.name)) item.value = '****';
+        });
         let reply = '🛠️ **Current Config (canonical keys):**\n';
         for (const { name, value } of keys) {
-          reply += `- \`${name}\`: \`${value || '(not set)'}\`\n`;
+          const maskedValue = isSensitive(name) ? '****' : (value || '(not set)');
+          reply += `- \`${name}\`: \`${maskedValue}\`\n`;
         }
         reply += '\nUse these keys for `config set` and `config delete`.';
         return message.reply(reply);
@@ -49,7 +62,14 @@ module.exports = async function handleConfigCommand(message, args, axios, logger
         const res = await axios.get(`http://ai-gateway:8000/show/config/${key}`, {
           headers
         });
-        return message.reply(res.data.text);
+        // Mask sensitive value if key matches pattern
+        const SENSITIVE_PATTERNS = [/key/i, /token/i, /secret/i, /password/i];
+        function isSensitive(k) {
+          return SENSITIVE_PATTERNS.some((pat) => pat.test(k));
+        }
+        let value = res.data.text;
+        if (isSensitive(key)) value = '****';
+        return message.reply(`\`${key}\`: \`${value}\``);
       } else {
       return message.reply('\u2753 Usage: `@bot config show` or `@bot config show <key>`');
       }
@@ -73,6 +93,11 @@ module.exports = async function handleConfigCommand(message, args, axios, logger
     if (!headers['X-User-ID']) {
       logger.error('Config set failed: Missing user ID in headers');
       return message.reply('❌ Internal error: Missing user ID for access control.');
+    }
+    // Only allow canonical keys
+    const ALLOWED_KEYS = ['OPENAI_MODEL', 'AI_PROVIDER', 'AI_PERSONALITY'];
+    if (!ALLOWED_KEYS.includes(key)) {
+      return message.reply(`❌ Invalid config key: ${key}. Allowed keys: ${ALLOWED_KEYS.join(', ')}`);
     }
     logger.info(`${message.author.username} (${message.author.id}) [${userRole}]: config set ${key} = ${value}`);
     try {

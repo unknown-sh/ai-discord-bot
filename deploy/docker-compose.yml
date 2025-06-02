@@ -4,37 +4,24 @@ services:
     build:
       context: ../
       dockerfile: discord-client/Dockerfile
-    environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN}      # Discord bot token
-      SUPABASE_URL: ${SUPABASE_URL}        # Supabase project URL
-      SUPABASE_KEY: ${SUPABASE_KEY}        # Supabase service key
-      OPENAI_MODEL: ${OPENAI_MODEL}        # OpenAI model name
-      AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
-      AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
-      LOG_FILE: ${LOG_FILE}                # Log file path
-      MCP_SERVER_URL: ${MCP_SERVER_URL}    # MCP memory API endpoint
+    env_file:
+      - ../.env
     depends_on:
       - ai-gateway
       - mcp-memory
     restart: unless-stopped
+    volumes:
+      - ../logs:/app/logs  # Optional: for file logging if LOG_FILE is set to logs/
 
   # AI gateway service
   ai-gateway:
     build:
       context: ..
       dockerfile: Dockerfile.ai-gateway
+    env_file:
+      - ../.env
     environment:
       PYTHONPATH: /app:/app/mcp_server:/app/common:/app/config_engine
-      OPENAI_API_KEY: ${OPENAI_API_KEY}    # OpenAI API key
-      SUPABASE_URL: ${SUPABASE_URL}        # Supabase project URL
-      SUPABASE_KEY: ${SUPABASE_KEY}        # Supabase service key
-      OPENAI_MODEL: ${OPENAI_MODEL}        # OpenAI model name
-      AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
-      AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
-      LOG_FILE: ${LOG_FILE}                # Log file path
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}              # Discord OAuth client ID
-      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}      # Discord OAuth client secret
-      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}        # Discord OAuth redirect URI
     # volumes:
     #   - ../config_engine:/app/config_engine
     #   - ../ai_gateway:/app/ai_gateway
@@ -50,15 +37,38 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    volumes:
+      - ../logs:/app/logs  # Optional: for file logging if LOG_FILE is set to logs/
 
   # MCP Memory API service
   mcp-memory:
     build:
       context: ..
       dockerfile: Dockerfile.mcp-memory
+    env_file:
+      - ../.env
     ports:
       - "8001:8001"
     restart: unless-stopped
+    volumes:
+      - ../logs:/app/logs  # Optional: for file logging if LOG_FILE is set to logs/
+
+  # MCP Server (handles MCP API endpoints)
+  mcp-server:
+    build:
+      context: ..
+      dockerfile: mcp_server/Dockerfile
+    env_file:
+      - ../.env
+    ports:
+      - "8002:8001"
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app:/app/mcp_server:/app/common:/app/config_engine
+    depends_on:
+      - mcp-memory
+    volumes:
+      - ../logs:/app/logs
 
 # Define a default network for inter-service communication
 networks:

@@ -7,6 +7,12 @@ Main FastAPI application for AI Gateway.
 """
 
 import os
+# --- Ensure .env is loaded early ---
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from ai_gateway.audit_helpers import log_audit_event
 from ai_gateway.context_memory import router as context_memory_router
@@ -77,6 +83,20 @@ class RoleUpdate(BaseModel):
 
 # --- Example endpoints below (add more as needed) ---
 
+from ai_gateway.supabase_config import get_config
+from common.utils import mask_value
+from fastapi import Query
+
+@app.get("/debug/env")
+async def debug_env(role: str = Query(None)):
+    """Show env and config values for debugging."""
+    env_key = os.getenv("OPENAI_API_KEY")
+    config_key = await get_config("OPENAI_API_KEY", role=role)
+    return {
+        "os.getenv('OPENAI_API_KEY')": mask_value("OPENAI_API_KEY", env_key or ""),
+        "get_config('OPENAI_API_KEY')": mask_value("OPENAI_API_KEY", config_key or ""),
+        "role": role or "(not set)"
+    }
 
 @app.get("/acl/role/{user_id}")
 async def get_user_role_route(user_id: str, request: Request) -> dict:
@@ -138,10 +158,17 @@ async def debug_root():
 
 
 @app.on_event("startup")
-async def list_routes():
+async def startup_tasks():
     print("=== Registered Routes ===")
     for route in app.routes:
         print(f"{route.path} -> {getattr(route, 'endpoint', None)}")
+    # --- Log presence of critical config keys ---
+    from ai_gateway.supabase_config import get_config
+    from common.utils import mask_value
+    env_key = os.getenv("OPENAI_API_KEY")
+    print(f"[Startup] os.getenv('OPENAI_API_KEY'): {mask_value('OPENAI_API_KEY', env_key or '')}")
+    openai_key = await get_config("OPENAI_API_KEY")
+    print(f"[Startup] get_config('OPENAI_API_KEY'): {mask_value('OPENAI_API_KEY', openai_key or '')}")
 
 if __name__ == "__main__":
     import uvicorn

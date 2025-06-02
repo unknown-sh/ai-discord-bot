@@ -1,5 +1,10 @@
 fastapi
-uvicorn
+uvicorn[standard]
 httpx
 pydantic
 python-dotenv
+supabase
+pydantic-settings
+python-jose[cryptography]
+python-multipart
+openai==1.82.1

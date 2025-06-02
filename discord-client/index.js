@@ -44,6 +44,7 @@ const handleHelpCommand = require('./commands/help');
 const handleConfigCommand = require('./commands/config');
 const handleRoleCommand = require('./commands/role');
 const handleAskCommand = require('./commands/ask');
+const handleAuditCommand = require('./commands/audit');
 
 // Start HTTP healthcheck server (for Docker)
 require('./healthz');
@@ -82,6 +83,8 @@ client.on('messageCreate', async (message) => {
       await handleConfigCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
     } else if (command === 'role') {
       await handleRoleCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
+    } else if (command === 'audit') {
+      await handleAuditCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
     } else {
       // Any other message: treat as AI prompt (including one-word messages like 'hello')
       const aiArgs = [command, ...args].filter(Boolean);

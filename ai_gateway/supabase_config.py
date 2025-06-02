@@ -23,6 +23,8 @@ ALLOWED_KEYS = {
     "MISTRAL_BASE_URL",
 }
 
+from common.utils import SENSITIVE_KEYS, mask_value
+
 import asyncio
 
 
@@ -51,11 +53,11 @@ async def set_config(key: str, value: str) -> None:
         raise
 
 
-async def get_config(key: str) -> str:
+async def get_config(key: str, role: str = None) -> str:
     """
     Asynchronously fetch a config value from Supabase, falling back to environment variable if not found.
-    Sensitive values are masked in logs.
-    Returns the config value as a string (may be None if not found).
+    Sensitive values are masked in logs and only shown unmasked to superadmin via explicit request.
+    Returns the config value as a string (masked or None if not found).
     """
     try:
         res = await asyncio.to_thread(
@@ -68,37 +70,55 @@ async def get_config(key: str) -> str:
         data = res.data
         if data:
             value = data[0]["value"]
-            masked = mask_value(key, value)
-            logging.info(f"[Supabase] Fetched config key '{key}': '{masked}'")
+            if key in SENSITIVE_KEYS:
+                if role == "superadmin":
+                    logging.info(f"[Supabase] Fetched sensitive config key '{key}': (masked for log)")
+                    return value
+                else:
+                    return None
+            logging.info(f"[Supabase] Fetched config key '{key}': '{mask_value(key, value)}'")
             return value
         fallback = os.getenv(key)
-        masked = mask_value(key, fallback)
+        if key in SENSITIVE_KEYS and role != "superadmin":
+            return None
         logging.info(
-            f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{masked}'"
+            f"[Supabase Fallback] No value for key '{key}' in DB; using .env fallback: '{mask_value(key, fallback)}'"
         )
         return fallback
     except Exception as e:
         fallback = os.getenv(key)
-        masked = mask_value(key, fallback)
+        if key in SENSITIVE_KEYS and role != "superadmin":
+            return None
         logging.warning(
-            f"[Supabase Fallback] Failed to fetch config for key '{key}': {str(e)} — using fallback: '{masked}'"
+            f"[Supabase Fallback] Failed to fetch config for key '{key}': {str(e)} — using fallback: '{mask_value(key, fallback)}'"
         )
         return fallback
 
 
-async def get_all_config() -> dict[str, str]:
+async def get_all_config(role: str = None) -> dict[str, str]:
     """
-    Asynchronously fetch all config values from Supabase, masking sensitive ones.
-    Returns a dict of config keys to masked values.
+    Asynchronously fetch all config values from Supabase, masking or omitting sensitive ones.
+    Returns a dict of config keys to masked values for admins, or all for superadmin (masked in bulk).
     """
     try:
         res = await asyncio.to_thread(
             lambda: supabase.table("bot_config").select("*").execute()
         )
         data = res.data
+        config = {}
         if data:
-            config = {row["key"]: mask_value(row["key"], row["value"]) for row in data}
-            logging.info(f"[Supabase] Fetched all config: {config}")
+            for row in data:
+                key = row["key"]
+                value = row["value"]
+                if key in SENSITIVE_KEYS:
+                    if role == "superadmin":
+                        config[key] = mask_value(key, value)
+                    else:
+                        # Hide from admin in bulk listing
+                        continue
+                else:
+                    config[key] = value
+            logging.info(f"[Supabase] Fetched all config (role={role}): {config}")
             return config
         logging.info("[Supabase] No config found in DB.")
         return {}

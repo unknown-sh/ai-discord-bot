@@ -19,6 +19,7 @@ async def show_config_list(
     request: Request, user_id=None, user_id_ctx=None, username=None, role=None
 ) -> dict:
     user_id = user_id or user_id_ctx
+    role = role or "admin"
     await log_audit_event(
         user_id,
         "list_config_keys",
@@ -26,8 +27,9 @@ async def show_config_list(
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-    lines = [f"{k}: {v['desc']}" for k, v in CONFIG_HELP.items()]
-    return {"text": "Available config keys:\n" + "\n".join(lines)}
+    config = await get_all_config(role)
+    lines = [f"{k}: {v if v is not None else '(hidden)'}" for k, v in config.items()]
+    return {"text": "Current config (sensitive keys hidden):\n" + "\n".join(lines)}
 
 
 @router.get("/show/config/{key}")
@@ -36,17 +38,42 @@ async def show_config_key(
     key: str, request: Request, user_id=None, user_id_ctx=None, username=None, role=None
 ) -> dict:
     user_id = user_id or user_id_ctx
-    await log_audit_event(
-        user_id,
-        f"show_config_key:{key}",
-        username=username,
-        ip=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-    )
-    value = await get_config(key)
-    if value is None:
-        return {"text": f"No value set for config key: {key}"}
-    return {"text": f"Current value for `{key}`: {value}"}
+    role = role or "admin"
+    from common.utils import SENSITIVE_KEYS, mask_value
+    is_sensitive = key in SENSITIVE_KEYS
+    value = await get_config(key, role)
+    if is_sensitive:
+        if role != "superadmin":
+            await log_audit_event(
+                user_id,
+                f"forbidden_show_sensitive_config:{key}",
+                username=username,
+                ip=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+            return {"text": f"\u26d4 Access to sensitive config key `{key}` is restricted to superadmins."}
+        # log access for superadmin
+        await log_audit_event(
+            user_id,
+            f"show_sensitive_config:{key}",
+            username=username,
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        if value is None:
+            return {"text": f"No value set for sensitive config key: {key}"}
+        return {"text": f"Current value for sensitive `{key}`: {mask_value(key, value)} (full value only in secure dashboard)"}
+    else:
+        await log_audit_event(
+            user_id,
+            f"show_config_key:{key}",
+            username=username,
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        if value is None:
+            return {"text": f"No value set for config key: {key}"}
+        return {"text": f"Current value for `{key}`: {value}"}
 
 
 @router.post("/set/config/{key}")
@@ -95,6 +122,7 @@ async def config_status(request: Request, user_id=None, user_id_ctx=None, userna
     Returns a summary of the current config: provider, model, and personality.
     """
     user_id = user_id or user_id_ctx
+    role = role or "admin"
     await log_audit_event(
         user_id,
         "config_status",
@@ -102,9 +130,9 @@ async def config_status(request: Request, user_id=None, user_id_ctx=None, userna
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-    provider = await get_config("AI_PROVIDER")
-    model = await get_config("OPENAI_MODEL")
-    personality = await get_config("AI_PERSONALITY")
+    provider = await get_config("AI_PROVIDER", role)
+    model = await get_config("OPENAI_MODEL", role)
+    personality = await get_config("AI_PERSONALITY", role)
     return {
         "provider": provider,
         "model": model,

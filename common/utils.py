@@ -77,9 +77,12 @@ async def try_or_log(coro, fallback: Any = None) -> Any:
 def mask_value(key: str, value: str) -> str:
     """
     Mask sensitive config values for logging or display.
-    Returns '****' for sensitive keys, otherwise returns the value as-is.
+    For sensitive keys, returns partial mask (e.g., sk-****23) if value is long enough, else '****'.
+    Otherwise returns the value as-is.
     """
     if key in SENSITIVE_KEYS and value:
+        if len(value) > 8:
+            return value[:3] + "****" + value[-2:]
         return "****"
     return value
 

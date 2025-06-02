@@ -32,6 +32,9 @@ services:
       AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
       AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
       LOG_FILE: ${LOG_FILE}                # Log file path
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}              # Discord OAuth client ID
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}      # Discord OAuth client secret
+      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}        # Discord OAuth redirect URI
     # volumes:
     #   - ../config_engine:/app/config_engine
     #   - ../ai_gateway:/app/ai_gateway

@@ -1,7 +1,7 @@
 // src/api/audit.js
 import axios from "axios";
-import config from "../dashboard-config";
-import { getDiscordHeaders } from "./auth";
+import config from "../dashboard-config.js";
+import { getDiscordHeaders } from "./auth.js";
 
 export async function fetchAuditLogs() {
   const headers = await getDiscordHeaders();

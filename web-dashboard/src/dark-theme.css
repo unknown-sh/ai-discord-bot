@@ -1,0 +1,64 @@
+:root {
+  --bg: #181a20;
+  --panel: #23272f;
+  --text: #e3e7ef;
+  --text-muted: #a2a7b9;
+  --primary: #5865f2;
+  --primary-hover: #4752c4;
+  --danger: #ed4245;
+  --success: #43b581;
+  --border: #22242c;
+  --input-bg: #23272f;
+  --input-border: #36393f;
+  --modal-bg: #23272f;
+}
+
+body[data-theme="dark"] {
+  background: var(--bg);
+  color: var(--text);
+}
+
+[data-theme="dark"] .panel, [data-theme="dark"] .modal {
+  background: var(--panel);
+  color: var(--text);
+}
+
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, [data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6 {
+  color: var(--text);
+}
+
+[data-theme="dark"] button {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+}
+
+[data-theme="dark"] button:hover {
+  background: var(--primary-hover);
+}
+
+[data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+}
+
+[data-theme="dark"] .text-muted {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .bordered {
+  border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .error {
+  color: var(--danger);
+}
+
+[data-theme="dark"] .success {
+  color: var(--success);
+}
+
+[data-theme="dark"] a {
+  color: var(--primary);
+}

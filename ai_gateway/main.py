@@ -13,6 +13,7 @@ from ai_gateway.context_memory import router as context_memory_router
 from ai_gateway.error_middleware import GlobalErrorMiddleware
 from ai_gateway.routers import ask, config, help, roles
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config_engine.access import get_user_role
@@ -21,6 +22,15 @@ from mcp_server.router import router as mcp_router
 # --- App creation ---
 app = FastAPI()
 app.add_middleware(GlobalErrorMiddleware)
+
+# --- CORS Middleware ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:51892"],  # Your frontend port
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- Healthcheck endpoint ---

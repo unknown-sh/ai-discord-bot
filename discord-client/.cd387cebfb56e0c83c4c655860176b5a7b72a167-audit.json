@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": false,
+        "amount": 3
+    },
+    "auditLog": "/Users/james/Repos/ai-discord-bot/discord-client/.cd387cebfb56e0c83c4c655860176b5a7b72a167-audit.json",
+    "files": [
+        {
+            "date": 1748852816760,
+            "name": "/Users/james/Repos/ai-discord-bot/discord-client/bot_actions-2025-06-02.log",
+            "hash": "a7e93e53308ca9480708ea41f10c0246d231ae3107d59377daf0ffd9e6e833e5"
+        }
+    ],
+    "hashType": "sha256"
+}

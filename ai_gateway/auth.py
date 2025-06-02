@@ -108,7 +108,10 @@ async def auth_callback(code: str, request: Request, response: Response):
             raise HTTPException(status_code=400, detail="Discord token exchange failed")
 
         token_data = token_resp.json()
-        access_token = token_data["access_token"]
+        access_token = token_data.get("access_token")
+    if not access_token:
+        await log_audit_event(None, "login_failed_no_access_token", ip=ip, user_agent=user_agent)
+        raise HTTPException(status_code=400, detail="No access token in Discord response")
 
         # 2. Fetch user info
         user_resp = await client.get(
@@ -125,11 +128,17 @@ async def auth_callback(code: str, request: Request, response: Response):
             )
 
         user = user_resp.json()
-        discord_id = user["id"]
-        username = user["username"]
+        discord_id = user.get("id")
+        username = user.get("username")
+    if not discord_id or not username:
+        await log_audit_event(None, "login_failed_missing_user_info", ip=ip, user_agent=user_agent)
+        raise HTTPException(status_code=400, detail="Discord user info missing id or username")
 
     # 3. Check role in Supabase
     role = await get_user_role(discord_id)
+    if not role:
+        await log_audit_event(discord_id, "login_failed_no_role", username=username, ip=ip, user_agent=user_agent)
+        raise HTTPException(status_code=403, detail="No role assigned to user")
     if role not in ("admin", "superadmin"):
         await log_audit_event(
             discord_id,
@@ -142,7 +151,7 @@ async def auth_callback(code: str, request: Request, response: Response):
 
     # 4. Generate JWT tokens
     access_token = create_access_token(
-        {"sub": discord_id, "username": username, "role": role}
+        {"sub": discord_id, "username": username, "role": role, "avatar": user.get("avatar", "")}
     )
     refresh_token = secrets.token_urlsafe(64)
     csrf_token = secrets.token_urlsafe(32)
@@ -152,28 +161,35 @@ async def auth_callback(code: str, request: Request, response: Response):
 
     # 6. Set secure, HTTP-only cookies
     response = RedirectResponse("/dashboard")
+    # For local dev, set domain=None and secure=False to ensure cookies are accepted on localhost
+    cookie_params = {
+        "httponly": True,
+        "secure": False,  # Must be False for localhost unless using HTTPS
+        "samesite": "lax",
+        "domain": None,   # Explicitly None for localhost
+        "path": "/"
+    }
     response.set_cookie(
         key="ai_dash_token",
         value=f"Bearer {access_token}",
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_params
     )
     response.set_cookie(
         key="ai_dash_refresh",
         value=refresh_token,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        **cookie_params
     )
     response.set_cookie(
         key="ai_dash_csrf",
         value=csrf_token,
-        secure=not settings.DEBUG,
-        samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=False,  # CSRF token should be readable by JS
+        secure=False,
+        samesite="lax",
+        domain=None,
+        path="/"
     )
 
     # 7. Log successful login

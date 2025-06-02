@@ -1,0 +1,3 @@
+# Configuration for memory-store backend
+backend: supabase
+# For future: add config for vector/semantic memory, file, or in-memory backends

@@ -1,0 +1,16 @@
+FROM python:3.13.3-slim
+ENV PYTHONPATH=/app
+WORKDIR /app/mcp_server
+# Copy requirements files first for better Docker cache
+COPY requirements.txt /app/requirements.txt
+COPY mcp_server/requirements.txt /app/mcp_server/requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt \
+    && pip install --no-cache-dir -r /app/mcp_server/requirements.txt
+# Copy code
+COPY mcp_server /app/mcp_server
+COPY ai_gateway /app/ai_gateway
+COPY common /app/common
+COPY config_engine /app/config_engine
+EXPOSE 8001
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

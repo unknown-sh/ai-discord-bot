@@ -1,0 +1,1 @@
+This is a placeholder file to indicate where the 'tests/' directory should be created for backend FastAPI endpoint tests. Please create the directory 'ai-gateway/tests/' and re-run the test creation step.

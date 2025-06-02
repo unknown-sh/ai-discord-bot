@@ -1,0 +1,40 @@
+FROM python:3.13.3-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONPATH=/app:/app/mcp_server:/app/common:/app/config_engine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy all source code into /app
+COPY ai_gateway/ /app/ai_gateway/
+COPY requirements.txt /app/requirements.txt
+COPY setup.py /app/setup.py
+COPY mcp_server/ /app/mcp_server/
+COPY common/ /app/common/
+COPY config_engine/ /app/config_engine/
+
+# Diagnostic: show /app and /app/ai_gateway
+RUN ls -l /app && ls -l /app/ai_gateway
+
+# Create appuser before using it
+RUN useradd -m appuser
+
+# Ensure logs directory exists and is owned by appuser
+RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -e .
+
+RUN chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "ai_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

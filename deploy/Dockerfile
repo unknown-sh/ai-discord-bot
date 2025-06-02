@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13.3-slim
 
 # Set environment variables to prevent Python from creating .pyc files
 # and enable unbuffered output for better logging

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic-settings
+supabase
+python-jose[cryptography]
+pytest
+pytest-asyncio
+ruff
+openai==1.82.1
+python-multipart

@@ -1,43 +1,96 @@
+// Main Discord bot entry point (modularized)
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
+const path = require('path');
+const { createLogger, format, transports } = require('winston');
+require('winston-daily-rotate-file');
+
 const config = require('./bot-config');
+const hasRole = require('./utils/hasRole');
+const getDiscordHeaders = require('./utils/getDiscordHeaders');
+const formatErrorReply = require('./utils/formatErrorReply');
+
+// Logger setup
+const logFormat = format.printf(({ timestamp, level, message }) => {
+  return `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+});
+const logger = createLogger({
+  level: 'info',
+  format: format.combine(format.timestamp(), logFormat),
+  transports: [
+    new transports.DailyRotateFile({
+      filename: path.join(__dirname, 'bot_actions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: process.env.LOG_MAX_BYTES || '5m',
+      maxFiles: process.env.LOG_BACKUP_COUNT || '3d',
+      zippedArchive: true
+    }),
+    new transports.Console()
+  ]
+});
+
+function assertEnvVars(vars) {
+  for (const v of vars) {
+    if (!process.env[v]) {
+      logger.error(`Missing required environment variable: ${v}`);
+      throw new Error(`Missing required environment variable: ${v}`);
+    }
+  }
+}
+assertEnvVars(['DISCORD_TOKEN']);
+
+// Import command handlers
+const handleHelpCommand = require('./commands/help');
+const handleConfigCommand = require('./commands/config');
+const handleRoleCommand = require('./commands/role');
+const handleAskCommand = require('./commands/ask');
+
+// Start HTTP healthcheck server (for Docker)
+require('./healthz');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 client.on('ready', () => {
-  console.log(`Bot is logged in as ${client.user.tag}`);
+  logger.info(`Logged in as ${client.user.tag}`);
 });
 
-client.on('messageCreate', async message => {
+client.on('messageCreate', async (message) => {
+  logger.info(`[MSG EVENT] Received message: ${message.content} from ${message.author.tag}`);
   if (message.author.bot) return;
-  if (!message.mentions.has(client.user)) return;
 
-  const input = message.content.replace(/<@!?(\d+)>/, '').trim();
-  const [command, ...args] = input.split(/\s+/);
+  // Only respond if the bot is mentioned (by @mention or direct message)
+  const botWasMentioned = message.mentions.has(client.user);
+  const isDirectMessage = message.channel.type === 1 || message.channel.type === 'dm';
+  if (!botWasMentioned && !isDirectMessage) return;
 
-  if (command === 'help') {
-    if (args[0] === 'command' && args[1]) {
-      const res = await axios.get(`http://ai-gateway:8000/help/command/${args[1]}`);
-      return message.reply(res.data.text);
-    } else if (args[0] === 'config' && args[1]) {
-      const res = await axios.get(`http://ai-gateway:8000/help/config/${args[1]}`);
-      return message.reply(res.data.text);
-    } else {
-      const res = await axios.get(`http://ai-gateway:8000/help`);
-      return message.reply(res.data.text);
+  // Remove the mention from the message content if present
+  let input = message.content.trim();
+  if (botWasMentioned) {
+    const mention = `<@${client.user.id}>`;
+    if (input.startsWith(mention)) {
+      input = input.slice(mention.length).trim();
     }
   }
+  const args = input.split(/\s+/).filter(Boolean);
+  const commandRaw = args.shift();
+  const command = commandRaw ? commandRaw.toLowerCase() : '';
 
-  if (command === 'config' && args[0] === 'set' && args.length >= 3) {
-    const key = args[1];
-    const value = args.slice(2).join(' ');
-    await axios.post(`http://ai-gateway:8000/config/${key}`, { value });
-    return message.reply(`✅ Config updated: **${key} = ${value}**`);
+  try {
+    if (command === 'help') {
+      await handleHelpCommand(message, args, axios, logger);
+    } else if (command === 'config') {
+      await handleConfigCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
+    } else if (command === 'role') {
+      await handleRoleCommand(message, args, axios, logger, hasRole, getDiscordHeaders, formatErrorReply);
+    } else {
+      // Any other message: treat as AI prompt (including one-word messages like 'hello')
+      const aiArgs = [command, ...args].filter(Boolean);
+      await handleAskCommand(message, aiArgs, axios, logger, getDiscordHeaders, formatErrorReply);
+    }
+  } catch (err) {
+    logger.error(`Command error: ${err.message}`);
+    await message.reply(formatErrorReply(err, '❌ Bot error.'));
   }
-
-  // Default: treat as prompt
-  const response = await axios.post('http://ai-gateway:8000/ask', { message: input });
-  await message.reply(response.data.reply);
 });
 
 client.login(config.discordToken);

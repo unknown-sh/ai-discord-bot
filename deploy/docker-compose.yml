@@ -12,16 +12,19 @@ services:
       AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
       AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
       LOG_FILE: ${LOG_FILE}                # Log file path
+      MCP_SERVER_URL: ${MCP_SERVER_URL}    # MCP memory API endpoint
     depends_on:
       - ai-gateway
+      - mcp-memory
     restart: unless-stopped
 
   # AI gateway service
   ai-gateway:
     build:
-      context: ../
-      dockerfile: ai-gateway/Dockerfile
+      context: ..
+      dockerfile: Dockerfile.ai-gateway
     environment:
+      PYTHONPATH: /app:/app/mcp_server:/app/common:/app/config_engine
       OPENAI_API_KEY: ${OPENAI_API_KEY}    # OpenAI API key
       SUPABASE_URL: ${SUPABASE_URL}        # Supabase project URL
       SUPABASE_KEY: ${SUPABASE_KEY}        # Supabase service key
@@ -29,11 +32,29 @@ services:
       AI_PROVIDER: ${AI_PROVIDER}          # AI provider (e.g., openai)
       AI_PERSONALITY: ${AI_PERSONALITY}    # AI personality config
       LOG_FILE: ${LOG_FILE}                # Log file path
-    volumes:
-      - ../config-engine:/app/config_engine
-      - ../ai-gateway:/app/ai_gateway
+    # volumes:
+    #   - ../config_engine:/app/config_engine
+    #   - ../ai_gateway:/app/ai_gateway
+    #   - ../mcp_server:/app/mcp_server
     ports:
       - "8000:8000"
+    depends_on:
+      - mcp-memory
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # MCP Memory API service
+  mcp-memory:
+    build:
+      context: ..
+      dockerfile: Dockerfile.mcp-memory
+    ports:
+      - "8001:8001"
     restart: unless-stopped
 
 # Define a default network for inter-service communication

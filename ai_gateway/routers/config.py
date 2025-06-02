@@ -56,9 +56,11 @@ async def set_config_key(
     payload: ConfigUpdate,
     request: Request,
     user_id=None,
+    user_id_ctx=None,
     username=None,
     role=None,
 ):
+    user_id = user_id or user_id_ctx
     await log_audit_event(
         user_id,
         f"set_config_key:{key}",

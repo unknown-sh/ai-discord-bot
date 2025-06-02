@@ -25,8 +25,20 @@ module.exports = async function handleConfigCommand(message, args, axios, logger
         const res = await axios.get('http://ai-gateway:8000/config/status', {
           headers
         });
+        // Canonical keys from backend
         const { provider, model, personality } = res.data;
-        return message.reply(`\ud83d\udee0\ufe0f **Current Config:**\n- Provider: \`${provider}\`\n- Model: \`${model}\`\n- Personality: \`${personality || '(not set)'}\``);
+        // Also fetch canonical keys directly for clarity
+        const keys = [
+          { name: 'AI_PROVIDER', value: provider },
+          { name: 'OPENAI_MODEL', value: model },
+          { name: 'AI_PERSONALITY', value: personality }
+        ];
+        let reply = '🛠️ **Current Config (canonical keys):**\n';
+        for (const { name, value } of keys) {
+          reply += `- \`${name}\`: \`${value || '(not set)'}\`\n`;
+        }
+        reply += '\nUse these keys for `config set` and `config delete`.';
+        return message.reply(reply);
       } else if (args.length === 2) {
         const headers = getDiscordHeaders(message);
         if (!headers['X-User-ID']) {
